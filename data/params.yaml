@@ -1,3 +1,5 @@
 use_viso: false
 data_folder: /home/doom/zed
 use_closed_form: false
+init_x: 0.12
+init_y: 0.06

@@ -20,6 +20,7 @@ int main(int argc, char** argv)
     string rawFilename;
     bool use_viso = false;
     bool use_cfs = false;
+    double init_x, init_y;
 
     cout << endl
             << "\033[32mA demo implementing the method of stereo-odo calibration.\033[0m"
@@ -34,6 +35,8 @@ int main(int argc, char** argv)
         use_viso = CYaml::get().general()["use_viso"].as<bool>();
         rawFilename = CYaml::get().general()["data_folder"].as<std::string>();
         use_cfs = CYaml::get().general()["use_closed_form"].as<bool>();
+        init_x = CYaml::get().general()["init_x"].as<double>();
+        init_y = CYaml::get().general()["init_y"].as<double>();
     }
     else if(argc == 2){
         cout << "\033[31mInput params file directory: \033[0m" << argv[1] << endl << endl;
@@ -43,6 +46,8 @@ int main(int argc, char** argv)
         use_viso = CYaml::get().general()["use_viso"].as<bool>();
         rawFilename = CYaml::get().general()["data_folder"].as<std::string>();
         use_cfs = CYaml::get().general()["use_closed_form"].as<bool>();
+        init_x = CYaml::get().general()["init_x"].as<double>();
+        init_y = CYaml::get().general()["init_y"].as<double>();
     }
     else
     {
@@ -90,6 +95,7 @@ int main(int argc, char** argv)
     string odomName = rawFilename + "/newodom.txt";
     DataQueue odometryQueue;
     DataQueue stereovoQueue;
+    SE2 init_offset;
     int numOdom = Gm2dlIO::readRobotOdom(odomName, odometryQueue);
     if (numOdom == 0) {
       cerr << "No raw information read" << endl;
@@ -129,16 +135,18 @@ int main(int argc, char** argv)
                     in >> posemat(j, k);
             }
             if(first){
-                SE2 x(posemat(2,3),posemat(0,3),atan(posemat(0,2)/posemat(0,0)));
-                RobotOdom* ro = dynamic_cast<RobotOdom*>(odometryQueue.buffer().begin()->second);
-                initialStereoPose = ro->odomPose().inverse()*x;
+                init_offset.setTranslation(Eigen::Vector2d(init_x, init_y));
+                init_offset.setRotation(Eigen::Rotation2Dd::Identity());
+//                SE2 x(posemat(2,3),-posemat(0,3),acos(posemat(0,0)));
+//                RobotOdom* ro = dynamic_cast<RobotOdom*>(odometryQueue.buffer().begin()->second);
+                initialStereoPose = init_offset;
                 first = false;
             }
             // save stereo vo as robotOdom node.
             RobotOdom* tempVo = new RobotOdom;
             tempVo->setTimestamp(timeque[i]);
-            SE2 x(posemat(0,3),posemat(2,3),-atan(posemat(0,2)/posemat(0,0)));
-            tempVo->setOdomPose(x);
+            SE2 x(posemat(2,3),-posemat(0,3),acos(posemat(0,0)));
+            tempVo->setOdomPose(init_offset*x);
             stereovoQueue.add(tempVo);
             numVo++;
         }
